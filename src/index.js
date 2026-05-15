@@ -48,10 +48,9 @@ async function createFile(data) {
         await mkdir('./archivos', { recursive: true });
         let texto = "";
         for (const empleado of data) {
-            texto += Object.values(empleado).map(v => (!!v) ? v : "N/A").join(",");
-            await writeFile(`archivos/${empleado.cedula}.txt`, texto);
-            texto = "";
+            texto += `${Object.values(empleado).map(v => (!!v) ? v : "N/A").join(",")}\n`;
         }
+        await writeFile(`archivos/pago.txt`, texto);
     }
     catch (error) {
         console.error('Error creando el archivo:', error);
