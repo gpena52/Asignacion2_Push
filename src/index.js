@@ -12,9 +12,14 @@ var Validacion;
 (function (Validacion) {
     Validacion[Validacion["String"] = 0] = "String";
     Validacion[Validacion["Number"] = 1] = "Number";
-    Validacion[Validacion["Email"] = 2] = "Email";
-    Validacion[Validacion["TipoCuenta"] = 3] = "TipoCuenta";
+    Validacion[Validacion["Date"] = 2] = "Date";
+    Validacion[Validacion["Email"] = 3] = "Email";
+    Validacion[Validacion["TipoCuenta"] = 4] = "TipoCuenta";
 })(Validacion || (Validacion = {}));
+function parseDate(dateString) {
+    const [day, month, year] = dateString.split('/').map(Number);
+    return new Date(year ?? 0, (month ?? 0) - 1, day);
+}
 async function ask(question, type) {
     return new Promise(async (resolve) => {
         rl.question(question, async (answer) => {
@@ -25,6 +30,9 @@ async function ask(question, type) {
                     break;
                 case Validacion.Number:
                     isValid = !isNaN(Number(answer)) && Number(answer) > 0;
+                    break;
+                case Validacion.Date:
+                    isValid = isValidDate(parseDate(answer)) && parseDate(answer) > new Date();
                     break;
                 case Validacion.Email:
                     isValid = answer.trim() == "" || validator.isEmail(answer);
@@ -43,18 +51,32 @@ async function ask(question, type) {
         });
     });
 }
-async function createFile(data) {
+async function createFile(fechaPago, data) {
     try {
         await mkdir('./archivos', { recursive: true });
-        let texto = "";
+        let tipoRegistro = "E";
+        const codigoInstitucion = "401005107";
+        const bancoReceptor = "APAP";
+        const fechaTransmision = new Date().toLocaleDateString('es-DO');
+        const fechaPagoString = fechaPago.toLocaleDateString('es-DO');
+        let header = `${tipoRegistro},${codigoInstitucion},${bancoReceptor},${fechaTransmision},${fechaPagoString}`;
+        let texto = `${header}\n\n`;
         for (const empleado of data) {
             texto += `${Object.values(empleado).map(v => (!!v) ? v : "N/A").join(",")}\n`;
         }
+        tipoRegistro = "S";
+        const cantidadRegistros = data.length;
+        const totalNomina = data.reduce((sum, current) => sum + current.monto, 0);
+        let footer = `${tipoRegistro},${cantidadRegistros},${totalNomina}`;
+        texto += `\n${footer}`;
         await writeFile(`archivos/pago.txt`, texto);
     }
     catch (error) {
         console.error('Error creando el archivo:', error);
     }
+}
+function isValidDate(date) {
+    return !isNaN(date.getTime());
 }
 async function main() {
     let activo = true;
@@ -82,7 +104,8 @@ async function main() {
                 });
                 break;
             case "2":
-                await createFile(data);
+                const fechaPago = parseDate(await ask("Fecha de pago (dd/mm/yyyy): ", Validacion.Date));
+                await createFile(fechaPago, data);
                 activo = false;
                 break;
             default:
